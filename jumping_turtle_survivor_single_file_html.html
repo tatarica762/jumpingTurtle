@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jumping Turtle Survivor</title>
+<style>
+  :root{
+    --bg1:#87CEFA; /* sky */
+    --bg2:#A4E0FF;
+    --grass:#5bd65b;
+    --earth:#8b5a2b;
+    --ui:#111827;
+    --ui-2:#1f2937;
+    --accent:#ff3ea5;
+    --accent-2:#ffd166;
+    --white:#fff;
+    --pass:#16a34a;
+    --fail:#dc2626;
+  }
+  html,body{ height:100%; margin:0; font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: linear-gradient(var(--bg2), var(--bg1)); }
+  #wrap{ display:grid; place-items:center; height:100%; padding:16px; box-sizing:border-box; }
+  .game-card{ width:min(920px, 100%); background:rgba(255,255,255,.12); backdrop-filter: blur(6px) saturate(1.2); border:1px solid rgba(255,255,255,.25); border-radius:24px; box-shadow: 0 10px 28px rgba(0,0,0,.25); overflow:hidden; }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,.05)); color:var(--white); }
+  h1{ font-size: clamp(18px, 2.6vw, 26px); margin:0; letter-spacing:.4px; font-weight:800; text-shadow:0 2px 0 rgba(0,0,0,.25); }
+  .controls{ display:flex; gap:8px; align-items:center; }
+  .btn{ appearance:none; border:0; border-radius:999px; padding:10px 14px; font-weight:700; cursor:pointer; background:var(--accent); color:#fff; box-shadow:0 6px 0 rgba(0,0,0,.2); transform: translateY(0); transition:.15s transform, .15s box-shadow, .2s opacity; }
+  .btn.secondary{ background:var(--ui-2); }
+  .btn:active{ transform: translateY(2px); box-shadow:0 4px 0 rgba(0,0,0,.25); }
+  .btn[disabled]{ opacity:.55; cursor:not-allowed; }
+  .stat{ background:rgba(0,0,0,.3); padding:8px 12px; border-radius:999px; font-weight:800; }
+  #canvas{ width:100%; height:56vh; min-height:360px; display:block; background: linear-gradient(#74d1ff, #5ec2ff 65%, #a0f0ff); }
+  @media (min-height:900px){ #canvas{ height:64vh; } }
+  footer{ display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 16px; color:#0b1220; background:linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,.1)); }
+  .hint{ opacity:.9; font-size:14px; }
+  .legend{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .pill{ background:rgba(255,255,255,.7); border:1px dashed rgba(0,0,0,.2); padding:6px 10px; border-radius:999px; font-size:13px; }
+  .center-overlay{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
+  .panel{ pointer-events:auto; text-align:center; background:rgba(0,0,0,.65); color:#fff; padding:20px 18px; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,.35); }
+  .panel h2{ margin:.1rem 0 .5rem; font-size:28px; }
+  .panel p{ margin:.25rem 0 .5rem; }
+  .panel .btn{ margin-top:10px; }
+  .hide{ display:none; }
+  .tests{ font-size:12px; opacity:.85; }
+  .tests summary{ cursor:pointer; }
+  .tests .pass{ color:var(--pass); font-weight:700; }
+  .tests .fail{ color:var(--fail); font-weight:700; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="game-card">
+      <header>
+        <h1>🐢 Jumping Turtle Survivor</h1>
+        <div class="controls">
+          <span class="stat" id="score">Score: 0</span>
+          <span class="stat" id="hi">High: 0</span>
+          <button class="btn secondary" id="muteBtn" aria-pressed="false" title="Mute/Unmute (M)">🔊 Sound</button>
+          <button class="btn" id="retryBtn" title="Restart (R)">↻ Retry</button>
+        </div>
+      </header>
+      <div style="position:relative">
+        <canvas id="canvas" width="1200" height="540" aria-label="Jumping Turtle Survivor game canvas" role="img"></canvas>
+        <div class="center-overlay" id="overlayStart">
+          <div class="panel">
+            <h2>Tap / Click / Space to Jump</h2>
+            <p>Survive as long as you can; the turtle gets faster over time. Clouds, hills, trees, and ground all scroll with parallax for extra style points.</p>
+            <div class="legend" style="justify-content:center; margin-top:8px;">
+              <span class="pill">Jump: Space • ↑ • W • Tap</span>
+              <span class="pill">Retry: R</span>
+              <span class="pill">Mute: M</span>
+            </div>
+            <button class="btn" id="startBtn">Start!</button>
+          </div>
+        </div>
+        <div class="center-overlay hide" id="overlayGameOver">
+          <div class="panel">
+            <h2>Bonk! Game Over</h2>
+            <p id="finalStats">You scored 0</p>
+            <button class="btn" id="againBtn">Play Again</button>
+          </div>
+        </div>
+      </div>
+      <footer>
+        <div class="hint">Pro-tip: Time the jump a hair later as speed increases; turtles aren’t sprinters, but ours is scrappy.</div>
+        <div class="legend">
+          <span class="pill">Parallax On</span>
+          <span class="pill">Cartoon Mode</span>
+          <span class="pill">Family Friendly</span>
+        </div>
+      </footer>
+      <details class="tests" id="testPanel" style="padding:8px 16px 16px;">
+        <summary>Open test results</summary>
+        <div id="testResults">(tests will appear here)</div>
+      </details>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const hiEl = document.getElementById('hi');
+  const retryBtn = document.getElementById('retryBtn');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const overlayStart = document.getElementById('overlayStart');
+  const overlayGameOver = document.getElementById('overlayGameOver');
+  const finalStats = document.getElementById('finalStats');
+  const muteBtn = document.getElementById('muteBtn');
+  const testResults = document.getElementById('testResults');
+
+  // ---------- Audio (WebAudio bleeps for funny SFX) ----------
+  const AudioKit = (() => {
+    let ac; let muted = false;
+    function ensure(){ if(!ac) { try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return ac; }
+    function resume(){ const a=ensure(); if(a && a.state!=='running'){ a.resume(); } }
+    function envOsc({type='sine', freq=440, duration=.2, gain=0.3, attack=0.01, decay=0.15, detune=0}){
+      if(muted) return; const a=ensure(); if(!a) return;
+      const o=a.createOscillator(); const g=a.createGain();
+      o.type=type; o.frequency.value=freq; o.detune.value=detune;
+      g.gain.value=0; const now=a.currentTime;
+      g.gain.linearRampToValueAtTime(gain, now+attack);
+      g.gain.exponentialRampToValueAtTime(0.001, now+attack+decay);
+      o.connect(g).connect(a.destination); o.start();
+      o.stop(now+duration);
+    }
+    const api = {
+      jump(){ envOsc({type:'square', freq:520, detune:10, duration:.18, gain:.22, attack:.005, decay:.2}); },
+      bonk(){ envOsc({type:'sawtooth', freq:140, duration:.4, gain:.35, attack:.005, decay:.35}); },
+      score(){ envOsc({type:'triangle', freq:720, duration:.15, gain:.2, attack:.005, decay:.15}); },
+      milestone(){ envOsc({type:'triangle', freq:440, duration:.25, gain:.25, attack:.005, decay:.25}); setTimeout(()=>envOsc({type:'triangle', freq:660, duration:.25, gain:.25, attack:.005, decay:.25}), 90); },
+      click(){ envOsc({type:'triangle', freq:280, duration:.1, gain:.15, attack:.005, decay:.12}); },
+      resume,
+      toggleMute(){ muted=!muted; return !muted; },
+      isMuted(){ return muted; }
+    };
+    return api;
+  })();
+
+  // ---------- Game state ----------
+  const W = canvas.width; const H = canvas.height;
+  let time = 0; let running=false; let gameOver=false; let score=0; let high = +localStorage.getItem('jt_highscore')||0;
+  hiEl.textContent = `High: ${high}`;
+
+  // --- Fairness helpers (spawn & jump forgiveness) ---
+  const FAIR = {
+    maxObstacleW: 46,         // cap width to ensure single-jump clear
+    maxObstacleH: 36,         // cap height for safe clearance
+    baseGapPx: 520,           // starting gap in pixels before speed factor
+    minGapPx: 300,            // never spawn closer than this
+    jumpBufferMs: 140,        // queue jump shortly before landing
+    coyoteMs: 110             // grace period after leaving ground
+  };
+
+  let jumpBuffer = 0; // ms
+  let coyote = 0;     // ms
+
+  const world = {
+    groundY: H*0.78,
+    speed: 6, // base
+    maxSpeed: 22,
+    accel: 0.0009, // per ms
+  };
+
+  const input = { jump:false, justPressed:false };
+
+  const turtle = {
+    x: W*0.18, y: 0, vy: 0, w: 64, h: 48,
+    onGround:true,
+    jumpPower: 14.5,
+    gravity: 0.7,
+    anim: 0,
+  };
+  turtle.y = world.groundY - turtle.h;
+
+  const obstacles = [];
+  let nextSpawn = 0;
+
+  // ---------- Helpers ----------
+  function rand(a,b){ return Math.random()*(b-a)+a; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function rectsCollide(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+
+  // ---------- Drawing: Cartoon Turtle & World ----------
+  function drawBackground(dt){
+    // Sky gradient already via CSS; here: parallax clouds, hills, trees, ground.
+    const sp = world.speed;
+    time += dt;
+
+    // Cloud layer (slowest)
+    drawRepeatingLayer(0.06*sp, (x, y, i) => drawCloud(x, H*0.18 + Math.sin((x+i*90)*0.002)*8, 1.0));
+    // Hills layer
+    drawRepeatingLayer(0.18*sp, (x) => drawHills(x, H*0.62));
+    // Trees layer
+    drawRepeatingLayer(0.35*sp, (x) => drawTrees(x, H*0.70));
+
+    // Ground stripes
+    drawRepeatingLayer(1.0*sp, (x) => drawGround(x, world.groundY));
+  }
+
+  function drawRepeatingLayer(scrollSpeed, drawFn){
+    const tileW = 320; // arbitrary tile width
+    const offset = -((time*scrollSpeed) % tileW);
+    for(let x=offset - tileW; x < W + tileW; x += tileW){ drawFn(x, 0); }
+  }
+
+  function drawCloud(x,y,scale){
+    ctx.save(); ctx.translate(x,y); ctx.scale(scale, scale);
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    blob(0,0, 40); blob(26,-10, 24); blob(-30,-8, 26); blob(10,8, 22);
+    ctx.restore();
+    function blob(cx,cy,r){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }
+  }
+
+  function drawHills(x, baseY){
+    const g=ctx.createLinearGradient(0, baseY-80, 0, baseY+40);
+    g.addColorStop(0,'#72c472'); g.addColorStop(1,'#4aa84a');
+    ctx.fillStyle=g; roundedHill(x, baseY, 340, 80);
+    ctx.fillStyle='#5dbb5d'; roundedHill(x+180, baseY+10, 260, 65);
+  }
+  function roundedHill(x, baseY, w, h){
+    ctx.beginPath(); ctx.moveTo(x, baseY); ctx.quadraticCurveTo(x+w*0.5, baseY-h, x+w, baseY); ctx.lineTo(x+w, H); ctx.lineTo(x, H); ctx.closePath(); ctx.fill();
+  }
+
+  function drawTrees(x, baseY){
+    for(let i=0;i<3;i++){
+      const off = i*90 + 30;
+      const trunkH = 50 + (i*8);
+      ctx.fillStyle = '#7a4b2f'; ctx.fillRect(x+off, baseY-trunkH, 14, trunkH);
+      // puffy crown
+      ctx.fillStyle = ['#3bd264','#27c657','#2bd95e'][i%3];
+      ctx.beginPath(); ctx.arc(x+off+7, baseY-trunkH-10, 24, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+off-8, baseY-trunkH, 18, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+off+22, baseY-trunkH, 18, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  function drawGround(x, y){
+    // grass top
+    ctx.fillStyle = '#3ddc3d'; ctx.fillRect(x, y, 340, 14);
+    // soil
+    ctx.fillStyle = '#784421'; ctx.fillRect(x, y+14, 340, H-y-14);
+    // decorative pebbles
+    ctx.fillStyle = '#ffd166'; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(x+20+i*60, y+28 + (i%2)*6, 4, 0, Math.PI*2); ctx.fill(); }
+  }
+
+  function drawTurtle(t){
+    ctx.save(); ctx.translate(t.x, t.y);
+    // wobble animation
+    const bob = Math.sin(time*0.02)*2;
+    ctx.translate(0, bob);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(t.w*0.5, t.h*0.9, t.w*0.45, 6, 0, 0, Math.PI*2); ctx.fill();
+
+    // shell
+    ctx.save();
+    const shellGrad = ctx.createLinearGradient(0,0,0,t.h);
+    shellGrad.addColorStop(0, '#9b5de5');
+    shellGrad.addColorStop(1, '#6a4bd6');
+    ctx.fillStyle = shellGrad;
+    roundRect(6, 8, t.w-12, t.h-12, 16, true);
+    // shell pattern
+    ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, t.h*0.5); ctx.lineTo(t.w-10, t.h*0.5);
+    ctx.moveTo(t.w*0.5, 10); ctx.lineTo(t.w*0.5, t.h-10);
+    ctx.stroke();
+    ctx.restore();
+
+    // head
+    ctx.fillStyle = '#2bd95e'; roundRect(-18, 12, 28, 22, 10, true);
+    // eye
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-2, 20, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-1, 21, 2.2, 0, Math.PI*2); ctx.fill();
+    // cheek
+    ctx.fillStyle = 'rgba(255,62,165,.55)'; ctx.beginPath(); ctx.arc(5, 27, 3.2, 0, Math.PI*2); ctx.fill();
+
+    // legs (simple running cycle)
+    const step = Math.sin(time*0.4) * 6;
+    ctx.fillStyle = '#27c657';
+    roundRect(12, t.h-10, 14, 10 + step*0.25, 4, true); // rear
+    roundRect(t.w-26, t.h-10, 14, 10 - step*0.25, 4, true); // rear
+    roundRect(12, t.h-18, 14, 10 - step*0.25, 4, true); // front
+    roundRect(t.w-26, t.h-18, 14, 10 + step*0.25, 4, true); // front
+
+    // tail
+    ctx.fillStyle = '#27c657'; ctx.beginPath(); ctx.moveTo(t.w-4, t.h*0.6); ctx.lineTo(t.w+10, t.h*0.55); ctx.lineTo(t.w-4, t.h*0.75); ctx.closePath(); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawObstacle(o){
+    ctx.save(); ctx.translate(o.x, o.y);
+    // Cartoon rock-crab hybrid for flair
+    if(o.kind==='crab'){
+      // body
+      ctx.fillStyle = '#ff6b6b'; roundRect(0, 0, o.w, o.h, 10, true);
+      // eyes
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(8, -4, 6, 0, Math.PI*2); ctx.arc(o.w-8, -4, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(8, -4, 2.5, 0, Math.PI*2); ctx.arc(o.w-8, -4, 2.5, 0, Math.PI*2); ctx.fill();
+      // claws
+      ctx.fillStyle = '#ff8585'; roundRect(-10, 8, 14, 10, 4, true); roundRect(o.w-4, 8, 14, 10, 4, true);
+    } else {
+      // rock
+      ctx.fillStyle = '#c9b18f';
+      ctx.beginPath(); ctx.moveTo(0,o.h); ctx.lineTo(o.w*0.2, 6); ctx.lineTo(o.w*0.8, 0); ctx.lineTo(o.w, o.h*0.7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.fillRect(o.w*0.2, 10, 8, 6);
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r, fill){
+    ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); if(fill) ctx.fill(); else ctx.stroke();
+  }
+
+  // ---------- Spawning ----------
+  function spawnIfNeeded(dt){
+    nextSpawn -= dt;
+    if(nextSpawn > 0) return;
+
+    const kind = Math.random() < 0.4 ? 'crab' : 'rock';
+    const hRaw = kind==='crab' ? 28 : 24 + Math.floor(Math.random()* (FAIR.maxObstacleH-24));
+    const wRaw = kind==='crab' ? 36 : 22 + Math.floor(Math.random()* (FAIR.maxObstacleW-22));
+    const h = Math.min(hRaw, FAIR.maxObstacleH);
+    const w = Math.min(wRaw, FAIR.maxObstacleW);
+    const y = world.groundY - h;
+
+    // ensure not too close to last obstacle
+    const last = obstacles[obstacles.length-1];
+    const minGap = Math.max(FAIR.minGapPx, FAIR.baseGapPx - world.speed*12);
+    if(!last || (W - last.x) > minGap){
+      obstacles.push({ x: W+40, y, w, h, kind });
+    }
+    const pxBetween = clamp(minGap + rand(0, 180), FAIR.minGapPx, 900);
+    nextSpawn = pxBetween / (world.speed*1.55);
+  }
+
+  // ---------- Update ----------
+  function reset(){
+    world.speed = 6; score = 0; gameOver=false; turtle.y = world.groundY - turtle.h; turtle.vy=0; turtle.onGround=true; obstacles.length=0; nextSpawn=0; time=0; jumpBuffer=0; coyote=0; updateUI();
+  }
+
+  function update(dt){
+    // Speed scales up gradually
+    world.speed = clamp(world.speed + world.accel * dt, 0, world.maxSpeed);
+
+    // timers for fairness
+    jumpBuffer = Math.max(0, jumpBuffer - dt);
+    coyote = Math.max(0, coyote - dt);
+
+    // Spawn obstacles
+    spawnIfNeeded(dt);
+
+    // Update turtle physics
+    turtle.vy += turtle.gravity;
+    // variable jump height: release early for shorter hop
+    if(!input.jump && turtle.vy < -4){ turtle.vy += 0.9; }
+
+    turtle.y += turtle.vy;
+    if(turtle.y >= world.groundY - turtle.h){
+      if(!turtle.onGround){ coyote = FAIR.coyoteMs; }
+      turtle.y = world.groundY - turtle.h; turtle.vy = 0; turtle.onGround = true;
+    } else { turtle.onGround = false; }
+
+    // Apply input with jump buffer & coyote time
+    if((turtle.onGround || coyote>0) && jumpBuffer>0){
+      turtle.vy = -turtle.jumpPower; turtle.onGround=false; jumpBuffer=0; coyote=0; AudioKit.jump();
+    }
+
+    // Move obstacles & check collisions; score++ on pass
+    for(let i=obstacles.length-1;i>=0;i--){
+      const o = obstacles[i];
+      o.x -= world.speed;
+      if(rectsCollide({x:turtle.x+8, y:turtle.y+6, w:turtle.w-16, h:turtle.h-12}, o)){
+        // collision!
+        running=false; gameOver=true; AudioKit.bonk();
+        break;
+      }
+      if(o.x + o.w < turtle.x && !o.scored){ o.scored=true; score++; if(score%10===0) AudioKit.milestone(); else AudioKit.score(); }
+      if(o.x + o.w < -40){ obstacles.splice(i,1); }
+    }
+
+    // Update UI
+    updateUI();
+  }
+
+  function updateUI(){
+    scoreEl.textContent = `Score: ${score}`;
+    hiEl.textContent = `High: ${Math.max(high, score)}`;
+  }
+
+  // ---------- Main Loop ----------
+  let last = 0;
+  function frame(ts){
+    if(!last) last = ts; const dt = ts - last; last = ts;
+    // Clear canvas
+    ctx.clearRect(0,0,W,H);
+
+    // Background
+    drawBackground(dt);
+
+    // Obstacles
+    obstacles.forEach(drawObstacle);
+
+    // Turtle
+    drawTurtle(turtle);
+
+    if(running){ update(dt); }
+
+    if(gameOver){
+      // high score
+      if(score > high){ high = score; localStorage.setItem('jt_highscore', String(high)); }
+      finalStats.textContent = `Score: ${score} • High: ${high}`;
+      overlayGameOver.classList.remove('hide');
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- Controls ----------
+  function startGame(){ AudioKit.resume(); AudioKit.click(); reset(); overlayStart.classList.add('hide'); overlayGameOver.classList.add('hide'); running=true; }
+  function retry(){ AudioKit.click(); reset(); overlayGameOver.classList.add('hide'); running=true; }
+
+  startBtn.addEventListener('click', startGame);
+  againBtn.addEventListener('click', retry);
+  retryBtn.addEventListener('click', retry);
+
+  muteBtn.addEventListener('click', () => {
+    const unmuted = AudioKit.toggleMute();
+    muteBtn.textContent = unmuted ? '🔊 Sound' : '🔇 Muted';
+    muteBtn.setAttribute('aria-pressed', String(!unmuted));
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', (e)=>{
+    if(['Space','ArrowUp','KeyW'].includes(e.code)) { e.preventDefault(); input.jump = true; input.justPressed = true; jumpBuffer = FAIR.jumpBufferMs; }
+    if(e.code==='KeyM'){ muteBtn.click(); }
+    if(e.code==='KeyR' && !running){ retry(); }
+  });
+  window.addEventListener('keyup', (e)=>{ if(['Space','ArrowUp','KeyW'].includes(e.code)) { input.jump=false; input.justPressed=false; } });
+
+  // Pointer / touch
+  canvas.addEventListener('pointerdown', ()=>{ input.jump=true; input.justPressed=true; jumpBuffer = FAIR.jumpBufferMs; });
+  canvas.addEventListener('pointerup', ()=>{ input.jump=false; });
+  canvas.addEventListener('touchstart', ()=>{ input.jump=true; input.justPressed=true; jumpBuffer = FAIR.jumpBufferMs; }, {passive:true});
+  canvas.addEventListener('touchend', ()=>{ input.jump=false; }, {passive:true});
+
+  // Start overlay also starts on canvas click
+  overlayStart.addEventListener('click', (e)=>{
+    const target = e.target; if(target.id==='startBtn') return; startGame();
+  });
+
+  // Resize handling (keep internal canvas resolution, scale by CSS)
+  function onResize(){ /* canvas is styled via CSS for responsiveness */ }
+  window.addEventListener('resize', onResize);
+
+  // ---------- Minimal Test Suite ----------
+  // These run automatically and show results in the panel + console.
+  function runTests(){
+    const results = [];
+    function assert(name, cond){
+      const ok = !!cond; results.push({name, ok}); if(!ok) console.error('[FAIL]', name); else console.log('[PASS]', name); return ok;
+    }
+
+    // Test: clamp
+    assert('clamp lower bound', clamp(-5,0,10)===0);
+    assert('clamp upper bound', clamp(15,0,10)===10);
+    assert('clamp middle', clamp(5,0,10)===5);
+
+    // Test: rectsCollide
+    assert('collision true', rectsCollide({x:0,y:0,w:10,h:10},{x:5,y:5,w:10,h:10})===true);
+    assert('collision false', rectsCollide({x:0,y:0,w:10,h:10},{x:20,y:20,w:5,h:5})===false);
+
+    // Test: spawn fairness caps & gap
+    const savedRand = Math.random;
+    try {
+      // force a rock
+      Math.random = () => 0.9; // pick rock branch and mid sizes
+      nextSpawn = 0; obstacles.length = 0; world.speed = 10;
+      spawnIfNeeded(16);
+      assert('spawn created obstacle', obstacles.length===1);
+      assert('obstacle width cap', obstacles[0].w <= FAIR.maxObstacleW);
+      assert('obstacle height cap', obstacles[0].h <= FAIR.maxObstacleH);
+
+      // now prevent spawn due to min gap
+      const minGap = Math.max(FAIR.minGapPx, FAIR.baseGapPx - world.speed*12);
+      obstacles[0].x = W - (minGap - 10); // place last too close
+      nextSpawn = 0;
+      const before = obstacles.length;
+      spawnIfNeeded(16);
+      assert('min gap respected (no extra spawn)', obstacles.length===before);
+
+      // force crab branch
+      Math.random = () => 0.1; // crab
+      obstacles[0].x = -9999; // out of view so new one spawns
+      nextSpawn = 0;
+      spawnIfNeeded(16);
+      assert('crab spawns', obstacles.length>=2);
+    } finally {
+      Math.random = savedRand;
+    }
+
+    // Render results
+    const pass = results.filter(r=>r.ok).length; const total = results.length;
+    const html = [
+      `<div><span class="${pass===total?'pass':'fail'}">${pass}/${total} tests passed</span></div>`,
+      '<ul style="margin:.25rem 0 0 .9rem">',
+      ...results.map(r=>`<li>${r.ok?'<span class=pass>PASS</span>':'<span class=fail>FAIL</span>'} — ${r.name}</li>`),
+      '</ul>'
+    ].join('');
+    if(testResults) testResults.innerHTML = html;
+  }
+
+  // auto-run tests after initial frame so DOM is ready
+  setTimeout(runTests, 0);
+})();
+</script>
+</body>
+</html>
